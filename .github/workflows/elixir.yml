@@ -1,4 +1,4 @@
-name: Garuda CI
+name: Watchex CI
 
 on: [push, pull_request]
 
