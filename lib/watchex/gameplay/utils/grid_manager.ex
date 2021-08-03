@@ -59,6 +59,17 @@ defmodule Watchex.Gameplay.Utils.GridManager do
     get_new_position(gridmap[new_position.row][new_position.col], new_position, position)
   end
 
+  @spec get_attackable_positions(Position.t()) :: list(Position.t())
+  def get_attackable_positions(attack_position) do
+    current_row = attack_position.row
+    current_col = attack_position.col
+
+    for row <- (current_row - 1)..(current_row + 1),
+        col <- (current_col - 1)..(current_col + 1) do
+      Position.new(row, col)
+    end
+  end
+
   @spec get_new_position(tile_type :: number(), Position.t(), Position.t()) :: Position.t()
   defp get_new_position(nil, _new_position, old_position), do: old_position
   defp get_new_position(1, _new_position, old_position), do: old_position

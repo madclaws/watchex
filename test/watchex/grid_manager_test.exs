@@ -58,4 +58,11 @@ defmodule Watchex.GridManagerTest do
     new_position = GridManager.move_on_grid(gridmap, position, "Left")
     assert new_position.col === position.col and new_position.row === position.row
   end
+
+  test "test get_attackable_positions" do
+    attack_position = Position.new(5, 6)
+    attack_position_list = GridManager.get_attackable_positions(attack_position)
+    # IO.inspect(attack_position_list)
+    assert length(attack_position_list) === 9
+  end
 end

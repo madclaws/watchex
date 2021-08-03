@@ -38,6 +38,13 @@ defmodule WatchexWeb.WorldChannel do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_in("player_attack", action, socket) do
+    Logger.info("Player attack #{socket.assigns.user_id} => #{inspect(action)}")
+    Player.attack(socket.assigns.user_id, action)
+    {:noreply, socket}
+  end
+
   ## Utility functions
 
   @spec is_valid_player(params :: map()) :: boolean()

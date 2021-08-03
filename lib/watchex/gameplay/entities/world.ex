@@ -38,6 +38,18 @@ defmodule Watchex.Gameplay.Entities.World do
     GenServer.cast(Records.get_name(world_id), {"player_move", player_id, position, action})
   end
 
+  def on_player_attack(world_id, player_id, position, action) do
+    GenServer.cast(Records.get_name(world_id), {"player_attack", player_id, position, action})
+  end
+
+  def on_player_died(world_id, player_id) do
+    GenServer.cast(Records.get_name(world_id), {"player_died", player_id})
+  end
+
+  def respawn_player(world_id, player_id) do
+    GenServer.cast(Records.get_name(world_id), {"respawn", player_id})
+  end
+
   # Server callbacks
 
   @impl true
@@ -63,6 +75,34 @@ defmodule Watchex.Gameplay.Entities.World do
       position: new_position
     })
 
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({"player_attack", player_id, position, _action}, state) do
+    Enum.each(state.players, fn
+      {enemy_player_id, _value} when enemy_player_id !== player_id ->
+        Player.on_enemy_attack(enemy_player_id, position)
+
+      _ ->
+        :ok
+    end)
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({"player_died", player_id}, state) do
+    broadcast_to_all(state.id, "player_died", %{
+      id: player_id
+    })
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_cast({"respawn", player_id}, state) do
+    handle_player_respawn(player_id, state)
     {:noreply, state}
   end
 
@@ -150,5 +190,16 @@ defmodule Watchex.Gameplay.Entities.World do
   defp broadcast_to_all(world_id, event, data) do
     WatchexWeb.Endpoint.broadcast!("world:" <> world_id, event, data)
     :ok
+  end
+
+  @spec handle_player_respawn(String.t(), __MODULE__.t()) :: any()
+  defp handle_player_respawn(player_id, state) do
+    init_position = GridManager.get_random_position(state.grid)
+    Player.on_respawned(player_id, init_position)
+
+    broadcast_to_all(state.id, "player_respawned", %{
+      id: player_id,
+      position: init_position
+    })
   end
 end
