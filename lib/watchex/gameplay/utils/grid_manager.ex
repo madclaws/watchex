@@ -38,6 +38,32 @@ defmodule Watchex.Gameplay.Utils.GridManager do
     end
   end
 
+  @spec move_on_grid(map(), Position.t(), String.t()) :: Position.t()
+  def move_on_grid(gridmap, position, "Left") do
+    new_position = Position.new(position.row, position.col - 1)
+    get_new_position(gridmap[new_position.row][new_position.col], new_position, position)
+  end
+
+  def move_on_grid(gridmap, position, "Right") do
+    new_position = Position.new(position.row, position.col + 1)
+    get_new_position(gridmap[new_position.row][new_position.col], new_position, position)
+  end
+
+  def move_on_grid(gridmap, position, "Up") do
+    new_position = Position.new(position.row - 1, position.col)
+    get_new_position(gridmap[new_position.row][new_position.col], new_position, position)
+  end
+
+  def move_on_grid(gridmap, position, "Down") do
+    new_position = Position.new(position.row + 1, position.col)
+    get_new_position(gridmap[new_position.row][new_position.col], new_position, position)
+  end
+
+  @spec get_new_position(tile_type :: number(), Position.t(), Position.t()) :: Position.t()
+  defp get_new_position(nil, _new_position, old_position), do: old_position
+  defp get_new_position(1, _new_position, old_position), do: old_position
+  defp get_new_position(_, new_position, _old_position), do: new_position
+
   # gridMatrix will be a nested map, becuase that will give us O(1) access to elements in it,
   # unlike list in Elixir
   @spec convert_grid_to_map(list(), index :: number(), gridmap :: map()) :: map()

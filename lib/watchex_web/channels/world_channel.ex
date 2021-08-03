@@ -3,6 +3,7 @@ defmodule WatchexWeb.WorldChannel do
   Acts as communication interface between client and Game layer
   """
 
+  alias Watchex.Gameplay.Entities.Player
   alias Watchex.Gameplay.Entities.World
   require Logger
   use Phoenix.Channel
@@ -27,6 +28,13 @@ defmodule WatchexWeb.WorldChannel do
     create_world(world_id)
     |> create_player(world_id, player_id)
 
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_in("player_move", action, socket) do
+    Logger.info("Player move #{socket.assigns.user_id} => #{inspect(action)}")
+    Player.move(socket.assigns.user_id, action)
     {:noreply, socket}
   end
 

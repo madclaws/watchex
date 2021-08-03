@@ -17,6 +17,7 @@ defmodule WatchexWeb.UserSocket do
   # performing token verification on connect.
   @impl true
   def connect(params, socket, _connect_info) do
+    IO.puts(inspect(params))
     socket = assign(socket, :user_id, params["userId"])
     {:ok, socket}
   end
