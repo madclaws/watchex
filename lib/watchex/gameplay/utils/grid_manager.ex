@@ -6,11 +6,7 @@ defmodule Watchex.Gameplay.Utils.GridManager do
   @grid_width 10
   @grid_height 10
 
-  @empty_cell 0
   @wall_cell 1
-  @walkable_cell 2
-  @player_cell 3
-  @enemy_cell 4
 
   alias Watchex.Gameplay.Utils.Position
 

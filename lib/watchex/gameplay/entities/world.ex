@@ -26,42 +26,51 @@ defmodule Watchex.Gameplay.Entities.World do
 
   # Client functions
 
+  @spec start_link(keyword()) :: any()
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: Records.get_name(opts[:name]))
   end
 
+  @spec create_player(String.t(), String.t()) :: any()
   def create_player(world_id, player_id) do
     GenServer.call(Records.get_name(world_id), {"create_player", player_id})
   end
 
+  @spec on_player_move(String.t(), String.t(), Position.t(), String.t()) :: any()
   def on_player_move(world_id, player_id, position, action) do
     GenServer.cast(Records.get_name(world_id), {"player_move", player_id, position, action})
   end
 
+  @spec on_player_attack(String.t(), String.t(), Position.t(), String.t()) :: any()
   def on_player_attack(world_id, player_id, position, action) do
     GenServer.cast(Records.get_name(world_id), {"player_attack", player_id, position, action})
   end
 
+  @spec on_player_died(String.t(), String.t()) :: any()
   def on_player_died(world_id, player_id) do
     GenServer.cast(Records.get_name(world_id), {"player_died", player_id})
   end
 
+  @spec respawn_player(String.t(), String.t()) :: any()
   def respawn_player(world_id, player_id) do
     GenServer.cast(Records.get_name(world_id), {"respawn", player_id})
+  end
+
+  @spec on_player_left(String.t(), String.t()) :: any()
+  def on_player_left(world_id, player_id) do
+    GenServer.cast(Records.get_name(world_id), {"player_left", player_id})
   end
 
   # Server callbacks
 
   @impl true
   def init(opts) do
-    Logger.info("World created => #{inspect(opts[:info])}")
     {:ok, create_init_world_state(opts[:info])}
   end
 
   @impl true
   def handle_call({"create_player", player_id}, _from, state) do
     {status, world_state} = register_player(player_id, state)
-    # IO.inspect(world_state)
     {:reply, status, world_state}
   end
 
@@ -106,6 +115,26 @@ defmodule Watchex.Gameplay.Entities.World do
     {:noreply, state}
   end
 
+  @impl true
+  def handle_cast({"player_left", player_id}, state) do
+    state =
+      Map.delete(state.players, player_id)
+      |> then(&Map.update!(state, :players, fn _ -> &1 end))
+
+    Process.exit(GenServer.whereis(Records.get_name(player_id)), :kill)
+
+    broadcast_to_all(state.id, "player_left", %{
+      id: player_id
+    })
+
+    {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:DOWN, _, :process, _pid, _reason}, state) do
+    {:noreply, state}
+  end
+
   # Utility functions
 
   @spec create_init_world_state(map()) :: Watchex.Gameplay.World.t()
@@ -124,7 +153,7 @@ defmodule Watchex.Gameplay.Entities.World do
       spawn_player(init_position, player_id, state.id)
       |> update_world_state(init_position, player_id, state)
 
-    broadcast_player_joined(status, state.id, player_id, init_position)
+    broadcast_player_joined(status, world_state)
     {status, world_state}
   end
 
@@ -137,12 +166,12 @@ defmodule Watchex.Gameplay.Entities.World do
         Process.monitor(pid)
         :ok
 
-      {:error, {:already_started}, _pid} ->
+      {:error, {:already_started, _pid}} ->
         Logger.info("Player already in world #{player_id}")
         :ok
 
-      _ ->
-        Logger.info("Error on creating player #{player_id}")
+      error ->
+        Logger.info("Error on creating player #{player_id} #{inspect(error)}")
         :error
     end
   end
@@ -175,16 +204,19 @@ defmodule Watchex.Gameplay.Entities.World do
     put_in(gridmap[position.row][position.col], value)
   end
 
-  @spec broadcast_player_joined(spawn_status :: atom(), String.t(), String.t(), Position.t()) ::
+  @spec broadcast_player_joined(spawn_status :: atom(), __MODULE__.t()) ::
           any()
-  defp broadcast_player_joined(:ok, world_id, player_id, position) do
-    broadcast_to_all(world_id, "player_joined", %{
-      id: player_id,
-      position: position
-    })
+  defp broadcast_player_joined(:ok, state) do
+    players_in_world =
+      state.players
+      |> Enum.map(fn {player_id, _value} ->
+        %{id: player_id, position: Player.get_position(player_id)}
+      end)
+
+    broadcast_to_all(state.id, "player_joined", %{players: players_in_world})
   end
 
-  defp broadcast_player_joined(_, _, _, _), do: :error
+  defp broadcast_player_joined(_, _), do: :error
 
   @spec broadcast_to_all(String.t(), String.t(), map()) :: any()
   defp broadcast_to_all(world_id, event, data) do

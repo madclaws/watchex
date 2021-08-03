@@ -2,7 +2,7 @@
 
 **A barebone MMO server for Watchers**
 
-![watchex CI](https://github.com/madclaws/watchex/workflows/Garuda%20CI/badge.svg)
+[![Watchex CI](https://github.com/madclaws/watchex/actions/workflows/elixir.yml/badge.svg)]
 
 To start your Phoenix server:
 

@@ -7,6 +7,7 @@ defmodule Watchex.CommonUtils.Records do
     Registering and accessing named process.
     Accepts `process_name`
   """
+  @spec get_name(String.t()) :: tuple()
   def get_name(process_name) do
     {:via, Registry, {Watchex.GameRegistry, process_name}}
   end
@@ -15,6 +16,7 @@ defmodule Watchex.CommonUtils.Records do
     Returns if a process is still in Registry
     Accepts `process_name`
   """
+  @spec is_process_registered(String.t()) :: list()
   def is_process_registered(process_name) do
     Registry.lookup(Watchex.GameRegistry, process_name)
   end

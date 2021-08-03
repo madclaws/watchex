@@ -3,6 +3,7 @@ defmodule WatchexWeb.WorldChannel do
   Acts as communication interface between client and Game layer
   """
 
+  alias Watchex.CommonUtils.Records
   alias Watchex.Gameplay.Entities.Player
   alias Watchex.Gameplay.Entities.World
   require Logger
@@ -13,12 +14,9 @@ defmodule WatchexWeb.WorldChannel do
   @impl true
   def join("world:" <> world_id, params, socket) do
     if is_valid_player(params) do
-      Logger.metadata(world_id: world_id)
-      Logger.info("Player joined => #{socket.assigns[:user_id]}")
       Process.send_after(self(), {"after_join", params, world_id}, 10)
       {:ok, socket}
     else
-      Logger.info("Invalid player => #{socket.assigns[:user_id]} => #{world_id}")
       {:error, %{reason: "Player is invalid"}}
     end
   end
@@ -33,16 +31,19 @@ defmodule WatchexWeb.WorldChannel do
 
   @impl true
   def handle_in("player_move", action, socket) do
-    Logger.info("Player move #{socket.assigns.user_id} => #{inspect(action)}")
     Player.move(socket.assigns.user_id, action)
     {:noreply, socket}
   end
 
   @impl true
   def handle_in("player_attack", action, socket) do
-    Logger.info("Player attack #{socket.assigns.user_id} => #{inspect(action)}")
     Player.attack(socket.assigns.user_id, action)
     {:noreply, socket}
+  end
+
+  @impl true
+  def terminate(_reason, socket) do
+    on_terminate(socket.assigns.user_id, socket)
   end
 
   ## Utility functions
@@ -66,11 +67,11 @@ defmodule WatchexWeb.WorldChannel do
         :ok
 
       {:error, {:already_started, _child}} ->
-        Logger.info("World #{world_id} already created")
+        # Logger.info("World #{world_id} already created")
         :ok
 
-      error ->
-        Logger.info("Error creating World #{world_id} #{inspect(error)}")
+      _error ->
+        # Logger.info("Error creating World #{world_id} #{inspect(error)}")
         :error
     end
   end
@@ -81,4 +82,15 @@ defmodule WatchexWeb.WorldChannel do
   end
 
   defp create_player(_, _, _), do: nil
+
+  defp on_terminate(player_id, _socket) do
+    case Records.is_process_registered(player_id) do
+      [] ->
+        # Logger.info("No process exists <#{inspect player_id}>")
+        true
+
+      _ ->
+        Player.leave(player_id)
+    end
+  end
 end

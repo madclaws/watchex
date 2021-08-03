@@ -25,6 +25,8 @@ defmodule Watchex.Gameplay.Entities.Player do
   )
 
   # Client functions
+
+  @spec start(keyword()) :: any()
   def start(opts) do
     GenServer.start(__MODULE__, opts, name: Records.get_name(opts[:name]))
   end
@@ -54,7 +56,18 @@ defmodule Watchex.Gameplay.Entities.Player do
     GenServer.cast(Records.get_name(player_id), {"on_respawned", new_position})
   end
 
+  @spec get_position(String.t()) :: Position.t()
+  def get_position(player_id) do
+    GenServer.call(Records.get_name(player_id), "get_position")
+  end
+
+  @spec leave(String.t()) :: any()
+  def leave(player_id) do
+    GenServer.cast(Records.get_name(player_id), "leave")
+  end
+
   # Server callbacks
+
   @impl true
   def init(opts) do
     {:ok, create_init_state(opts)}
@@ -104,18 +117,25 @@ defmodule Watchex.Gameplay.Entities.Player do
   end
 
   @impl true
+  def handle_cast("leave", state) do
+    World.on_player_left(state.world_id, state.id)
+    {:noreply, state}
+  end
+
+  @impl true
   def handle_info("request_respawn", state) do
-    Logger.info("Player #{state.id} needs respawn")
     World.respawn_player(state.world_id, state.id)
     {:noreply, state}
   end
 
-  # Utility functions
+  @impl true
+  def handle_call("get_position", _from, state) do
+    {:reply, state.position, state}
+  end
 
+  # Utility functions
   @spec create_init_state(keyword()) :: __MODULE__.t()
   defp create_init_state(opts) do
-    Logger.info("Player created => #{opts[:id]} at #{inspect(opts[:position])}")
-
     __MODULE__.__struct__(
       id: opts[:id],
       position: opts[:position],
@@ -136,7 +156,7 @@ defmodule Watchex.Gameplay.Entities.Player do
 
   @spec update_attack_status(attack_status :: boolean(), __MODULE__.t()) :: __MODULE__.t()
   defp update_attack_status(true, state) do
-    World.on_player_died(state.world_id, state)
+    World.on_player_died(state.world_id, state.id)
     Process.send_after(self(), "request_respawn", 5_000)
 
     %__MODULE__{
