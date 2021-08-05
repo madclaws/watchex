@@ -75,7 +75,6 @@ defmodule Watchex.WorldTest do
     assert enemy_state.status === :died
   end
 
-
   test "player respawn after 5 seconds" do
     _pid = start_supervised!({World, name: "demo", info: %{id: "demo"}})
     World.create_player("demo", "hero", Position.new(2, 5))
