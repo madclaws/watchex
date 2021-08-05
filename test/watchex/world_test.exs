@@ -59,7 +59,31 @@ defmodule Watchex.WorldTest do
     assert hero_position2 === Position.new(2, 6)
   end
 
-  test "player attack" do
+  test "player move up" do
+    pid = start_supervised!({World, name: "demo", info: %{id: "demo"}})
+    _world_state = :sys.get_state(pid)
+    World.create_player("demo", "hero", Position.new(2, 6))
+    Player.move("hero", "Up")
+    :timer.sleep(1_000)
+    hero_pid = Records.get_name("hero")
+    hero_state = :sys.get_state(hero_pid)
+    hero_position2 = hero_state.position
+    assert hero_position2 === Position.new(1, 6)
+  end
+
+  test "player move down" do
+    pid = start_supervised!({World, name: "demo", info: %{id: "demo"}})
+    _world_state = :sys.get_state(pid)
+    World.create_player("demo", "hero", Position.new(2, 6))
+    Player.move("hero", "Down")
+    :timer.sleep(1_000)
+    hero_pid = Records.get_name("hero")
+    hero_state = :sys.get_state(hero_pid)
+    hero_position2 = hero_state.position
+    assert hero_position2 === Position.new(3, 6)
+  end
+
+  test "player attack: one enemy dies" do
     _pid = start_supervised!({World, name: "demo", info: %{id: "demo"}})
     World.create_player("demo", "hero", Position.new(2, 5))
     World.create_player("demo", "enemy", Position.new(2, 6))
@@ -73,6 +97,29 @@ defmodule Watchex.WorldTest do
     pid = Records.get_name("enemy")
     enemy_state = :sys.get_state(pid)
     assert enemy_state.status === :died
+  end
+
+  test "player attack: all dies" do
+    _pid = start_supervised!({World, name: "demo", info: %{id: "demo"}})
+    World.create_player("demo", "hero", Position.new(2, 5))
+    World.create_player("demo", "enemy", Position.new(1, 5))
+    World.create_player("demo", "enemy1", Position.new(3, 5))
+    World.create_player("demo", "enemy2", Position.new(2, 6))
+    World.create_player("demo", "enemy3", Position.new(2, 4))
+
+    _hero_pid = Records.get_name("hero")
+    Player.attack("hero", "Attack")
+    :timer.sleep(1_000)
+
+    statuses =
+      ["enemy", "enemy1", "enemy2", "enemy3"]
+      |> Enum.map(fn enemy ->
+        pid = Records.get_name(enemy)
+        enemy_state = :sys.get_state(pid)
+        enemy_state.status
+      end)
+
+    assert statuses === [:died, :died, :died, :died]
   end
 
   test "player respawn after 5 seconds" do

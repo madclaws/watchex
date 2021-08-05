@@ -46,6 +46,7 @@ defmodule WatchexWeb.WorldChannel do
   def handle_in("player_rejoin", rejoin_info, socket) do
     pos = Position.new(rejoin_info["pos"]["row"], rejoin_info["pos"]["col"])
     World.create_player(rejoin_info["world"], socket.assigns.user_id, pos)
+    broadcast_from!(socket, "player_rejoined", %{id: socket.assigns.user_id, position: pos})
     {:noreply, socket}
   end
 
