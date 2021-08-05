@@ -19,10 +19,11 @@ defmodule Watchex.Gameplay.Entities.World do
           grid: map(),
           id: String.t(),
           players: map(),
+          player_pids: map(),
           current_grid_id_index: number()
         }
 
-  defstruct(grid: %{}, id: "", players: %{}, current_grid_id_index: 3)
+  defstruct(grid: %{}, id: "", players: %{}, player_pids: %{}, current_grid_id_index: 3)
 
   # Client functions
 
@@ -31,9 +32,11 @@ defmodule Watchex.Gameplay.Entities.World do
     GenServer.start_link(__MODULE__, opts, name: Records.get_name(opts[:name]))
   end
 
-  @spec create_player(String.t(), String.t()) :: any()
-  def create_player(world_id, player_id) do
-    GenServer.call(Records.get_name(world_id), {"create_player", player_id})
+  @spec create_player(String.t(), String.t(), Position.t()) :: any()
+  def create_player(world_id, player_id, position \\ nil)
+
+  def create_player(world_id, player_id, position) do
+    GenServer.call(Records.get_name(world_id), {"create_player", player_id, position})
   end
 
   @spec on_player_move(String.t(), String.t(), Position.t(), String.t()) :: any()
@@ -65,18 +68,26 @@ defmodule Watchex.Gameplay.Entities.World do
 
   @impl true
   def init(opts) do
+    Process.flag(:trap_exit, true)
     {:ok, create_init_world_state(opts[:info])}
   end
 
   @impl true
-  def handle_call({"create_player", player_id}, _from, state) do
-    {status, world_state} = register_player(player_id, state)
+  def handle_call({"create_player", player_id, position}, _from, state) do
+    {status, world_state} = register_player(player_id, state, position)
     {:reply, status, world_state}
   end
 
   @impl true
   def handle_cast({"player_move", player_id, position, action}, state) do
     new_position = GridManager.move_on_grid(state.grid, position, action)
+    pid = state.players[player_id]
+
+    player_pid_data =
+      Map.update(state.player_pids, pid, {new_position, player_id}, fn _ ->
+        {new_position, player_id}
+      end)
+
     Player.update_position(player_id, new_position)
 
     broadcast_to_all(state.id, "move_updated", %{
@@ -84,7 +95,7 @@ defmodule Watchex.Gameplay.Entities.World do
       position: new_position
     })
 
-    {:noreply, state}
+    {:noreply, %{state | player_pids: player_pid_data}}
   end
 
   @impl true
@@ -121,17 +132,23 @@ defmodule Watchex.Gameplay.Entities.World do
       Map.delete(state.players, player_id)
       |> then(&Map.update!(state, :players, fn _ -> &1 end))
 
-    Process.exit(GenServer.whereis(Records.get_name(player_id)), :kill)
+    player_pid = GenServer.whereis(Records.get_name(player_id))
+    {position, _player_id} = state.player_pids[player_pid]
+
+    Process.exit(GenServer.whereis(Records.get_name(player_id)), :left)
 
     broadcast_to_all(state.id, "player_left", %{
-      id: player_id
+      id: player_id,
+      position: position
     })
 
     {:noreply, state}
   end
 
   @impl true
-  def handle_info({:DOWN, _, :process, _pid, _reason}, state) do
+  def handle_info({:EXIT, pid, reason}, state) do
+    state = handle_player_crash(reason, pid, state)
+
     {:noreply, state}
   end
 
@@ -145,9 +162,11 @@ defmodule Watchex.Gameplay.Entities.World do
     )
   end
 
-  @spec register_player(String.t(), __MODULE__.t()) :: {:ok | :error, __MODULE__.t()}
-  defp register_player(player_id, state) do
-    init_position = GridManager.get_random_position(state.grid)
+  @spec register_player(String.t(), __MODULE__.t(), Position.t()) ::
+          {:ok | :error, __MODULE__.t()}
+
+  defp register_player(player_id, state, position) do
+    init_position = get_new_position(position, state.grid)
 
     {status, world_state} =
       spawn_player(init_position, player_id, state.id)
@@ -159,30 +178,36 @@ defmodule Watchex.Gameplay.Entities.World do
 
   @spec spawn_player(Position.t(), String.t(), String.t()) :: any()
   defp spawn_player(position, player_id, world_id) do
-    status = Player.start(id: player_id, position: position, name: player_id, world_id: world_id)
+    status =
+      Player.start_link(id: player_id, position: position, name: player_id, world_id: world_id)
 
     case status do
       {:ok, pid} ->
-        Process.monitor(pid)
-        :ok
+        {:ok, pid}
 
-      {:error, {:already_started, _pid}} ->
-        Logger.info("Player already in world #{player_id}")
-        :ok
+      {:error, {:already_started, pid}} ->
+        {:ok, pid}
 
-      error ->
-        Logger.info("Error on creating player #{player_id} #{inspect(error)}")
+      _error ->
         :error
     end
   end
 
-  @spec update_world_state(status :: atom(), Position.t(), String.t(), __MODULE__.t()) ::
+  @spec update_world_state(
+          {status :: atom(), pid: pid()},
+          Position.t(),
+          String.t(),
+          __MODULE__.t()
+        ) ::
           {atom(), __MODULE__.t()}
-  defp update_world_state(:ok, position, player_id, state) do
+  defp update_world_state({:ok, pid}, position, player_id, state) do
     updated_players_data =
-      Map.update(state.players, player_id, state.current_grid_id_index, fn _ ->
-        state.current_grid_id_index
+      Map.update(state.players, player_id, pid, fn _ ->
+        pid
       end)
+
+    player_pids =
+      Map.update(state.player_pids, pid, {position, player_id}, fn _ -> {position, player_id} end)
 
     updated_grid =
       state.grid
@@ -192,6 +217,7 @@ defmodule Watchex.Gameplay.Entities.World do
      %{
        state
        | players: updated_players_data,
+         player_pids: player_pids,
          current_grid_id_index: state.current_grid_id_index + 1,
          grid: updated_grid
      }}
@@ -234,4 +260,29 @@ defmodule Watchex.Gameplay.Entities.World do
       position: init_position
     })
   end
+
+  # We need to restart the player to its old position, if it crashes unusually
+  @spec handle_player_crash(reason :: atom(), pid(), __MODULE__.t()) :: __MODULE__.t()
+  defp handle_player_crash(:left, pid, state) do
+    Map.delete(state.player_pids, pid)
+    |> then(&Map.update!(state, :player_pids, fn _ -> &1 end))
+  end
+
+  defp handle_player_crash(_reason, pid, state) do
+    {position, player_id} = state.player_pids[pid]
+
+    {_status, world_state} =
+      Map.delete(state.player_pids, pid)
+      |> then(&Map.update!(state, :player_pids, fn _ -> &1 end))
+      |> then(&register_player(player_id, &1, position))
+
+    world_state
+  end
+
+  @spec get_new_position(position :: Position.t(), gridmap :: map()) :: Position.t()
+  defp get_new_position(nil, gridmap) do
+    GridManager.get_random_position(gridmap)
+  end
+
+  defp get_new_position(position, _gridmap), do: position
 end

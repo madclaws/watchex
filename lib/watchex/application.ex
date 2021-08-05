@@ -14,7 +14,8 @@ defmodule Watchex.Application do
       # Start the Endpoint (http/https)
       WatchexWeb.Endpoint,
       {Registry, keys: :unique, name: Watchex.GameRegistry},
-      {DynamicSupervisor, strategy: :one_for_one, name: Watchex.WorldSupervisor}
+      {DynamicSupervisor, strategy: :one_for_one, name: Watchex.WorldSupervisor},
+      {DynamicSupervisor, strategy: :one_for_one, name: Watchex.PlayerSupervisor}
       # Start a worker by calling: Watchex.Worker.start_link(arg)
       # {Watchex.Worker, arg}
     ]

@@ -26,9 +26,9 @@ defmodule Watchex.Gameplay.Entities.Player do
 
   # Client functions
 
-  @spec start(keyword()) :: any()
-  def start(opts) do
-    GenServer.start(__MODULE__, opts, name: Records.get_name(opts[:name]))
+  @spec start_link(keyword()) :: any()
+  def start_link(opts) do
+    GenServer.start_link(__MODULE__, opts, name: Records.get_name(opts[:name]))
   end
 
   @spec move(String.t(), String.t()) :: any()

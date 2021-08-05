@@ -6,6 +6,7 @@ defmodule WatchexWeb.WorldChannel do
   alias Watchex.CommonUtils.Records
   alias Watchex.Gameplay.Entities.Player
   alias Watchex.Gameplay.Entities.World
+  alias Watchex.Gameplay.Utils.Position
   require Logger
   use Phoenix.Channel
 
@@ -42,6 +43,13 @@ defmodule WatchexWeb.WorldChannel do
   end
 
   @impl true
+  def handle_in("player_rejoin", rejoin_info, socket) do
+    pos = Position.new(rejoin_info["pos"]["row"], rejoin_info["pos"]["col"])
+    World.create_player(rejoin_info["world"], socket.assigns.user_id, pos)
+    {:noreply, socket}
+  end
+
+  @impl true
   def terminate(_reason, socket) do
     on_terminate(socket.assigns.user_id, socket)
   end
@@ -67,11 +75,9 @@ defmodule WatchexWeb.WorldChannel do
         :ok
 
       {:error, {:already_started, _child}} ->
-        # Logger.info("World #{world_id} already created")
         :ok
 
       _error ->
-        # Logger.info("Error creating World #{world_id} #{inspect(error)}")
         :error
     end
   end
@@ -86,7 +92,6 @@ defmodule WatchexWeb.WorldChannel do
   defp on_terminate(player_id, _socket) do
     case Records.is_process_registered(player_id) do
       [] ->
-        # Logger.info("No process exists <#{inspect player_id}>")
         true
 
       _ ->
