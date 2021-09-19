@@ -157,7 +157,7 @@ defmodule Watchex.Gameplay.Entities.Player do
   @spec update_attack_status(attack_status :: boolean(), __MODULE__.t()) :: __MODULE__.t()
   defp update_attack_status(true, state) do
     World.on_player_died(state.world_id, state.id)
-    Process.send_after(self(), "request_respawn", 5_000)
+    # Process.send_after(self(), "request_respawn", 5_000)
 
     %__MODULE__{
       state

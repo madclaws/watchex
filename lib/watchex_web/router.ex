@@ -19,10 +19,10 @@ defmodule WatchexWeb.Router do
     get "/", PageController, :index
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", WatchexWeb do
-  #   pipe_through :api
-  # end
+  scope "/api", WatchexWeb do
+    pipe_through :api
+    get "/ping", PingController, :ping
+  end
 
   # Enables LiveDashboard only for development
   #
